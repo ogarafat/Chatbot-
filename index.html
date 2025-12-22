@@ -107,9 +107,12 @@
         const sendBtn = document.getElementById('send-btn');
         const voiceBtn = document.getElementById('voice-btn');
 
-        // Web Speech API for voice input (Speech Recognition) and output (Speech Synthesis)
+        let messages = [
+            { role: 'system', content: 'তুমি Ai Fizza, একজন বন্ধুসুলভ, হাস্যোজ্জ্বল এবং সাহায্যকারী AI সহকারী। বাংলা, ইংরেজি, হিন্দি বা Banglish-এ উত্তর দাও। সবসময় ইমোজি ব্যবহার করো এবং বন্ধুর মতো কথা বলো। 😊' }
+        ];
+
         const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-        recognition.lang = 'bn-BD'; // Default Bengali, but can detect mixed
+        recognition.lang = 'bn-BD';
         recognition.continuous = false;
 
         const synth = window.speechSynthesis;
@@ -143,28 +146,49 @@
             addMessage(text, 'user');
             userInput.value = '';
 
+            messages.push({ role: 'user', content: text });
+
             addTypingIndicator();
 
-            // এখানে AI API কল করুন। xAI Grok API ব্যবহার করতে চাইলে https://x.ai/api থেকে API key নিন।
-            // উদাহরণস্বরূপ OpenAI-এর মতো (Grok API OpenAI compatible):
-            // fetch('https://api.x.ai/v1/chat/completions', { ... })
+            const API_KEY = 'xai-IclkRXuOcphsl0q8zmk21Qdpwm6ee9SHNznrdoXjvRhDVUYmG7oymzruO1ocliUxvtbPuJh04jdNLiZl'; // এখানে আপনার নতুন xAI API কী বসান
 
-            // ডেমোর জন্য সিম্পল human-like রেসপন্স (প্রোডাকশনে AI API দিয়ে রিপ্লেস করুন)
-            setTimeout(() => {
-                removeTypingIndicator();
-                let response = 'দুঃখিত, এই ডেমোতে পুরো AI ইন্টিগ্রেশন নেই। প্রোডাকশনে xAI Grok API ব্যবহার করুন। উদাহরণ রেসপন্স: ' + text.split('').reverse().join('');
-                if (text.toLowerCase().includes('hello') || text.includes('হ্যালো')) {
-                    response = 'হ্যালো! কেমন আছেন? 😊';
-                } else if (text.includes('গণিত') || text.includes('math')) {
-                    response = 'গণিতের প্রশ্ন? উদাহরণ: 2+2=4। আপনার প্রশ্ন বলুন!';
+            try {
+                const response = await fetch('https://api.x.ai/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${API_KEY}`
+                    },
+                    body: JSON.stringify({
+                        model: 'grok-4',
+                        messages: messages,
+                        temperature: 0.7,
+                        max_tokens: 800,
+                        stream: false
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.status} - ${await response.text()}`);
                 }
-                addMessage(response, 'bot');
 
-                // Voice output
-                const utter = new SpeechSynthesisUtterance(response);
-                utter.lang = 'bn-BD'; // Bengali voice, browser-এ available হলে
+                const data = await response.json();
+                const botResponse = data.choices[0].message.content;
+
+                messages.push({ role: 'assistant', content: botResponse });
+
+                removeTypingIndicator();
+                addMessage(botResponse, 'bot');
+
+                const utter = new SpeechSynthesisUtterance(botResponse);
+                utter.lang = 'bn-BD';
                 synth.speak(utter);
-            }, 1500);
+
+            } catch (error) {
+                removeTypingIndicator();
+                addMessage('দুঃখিত, কোনো সমস্যা হয়েছে: ' + error.message + '। API কী চেক করুন।', 'bot');
+                console.error(error);
+            }
         }
 
         sendBtn.addEventListener('click', sendMessage);
@@ -172,7 +196,6 @@
             if (e.key === 'Enter') sendMessage();
         });
 
-        // Voice input
         voiceBtn.addEventListener('click', () => {
             recognition.start();
             voiceBtn.textContent = '🛑';
@@ -190,4 +213,4 @@
         };
     </script>
 </body>
-  </html>
+    </html>
